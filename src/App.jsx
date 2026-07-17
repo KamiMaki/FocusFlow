@@ -783,6 +783,9 @@ export default class App extends React.Component {
       // pause modal
       showPause: s.showPause,
 
+      // finish modal
+      showFinish: s.showFinish,
+
       // project manager
       showProjMgr: s.showProjMgr,
       openProjMgr: () => this.setState({ showProjMgr: true }),
