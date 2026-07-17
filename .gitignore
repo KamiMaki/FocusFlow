@@ -1,6 +1,9 @@
 node_modules/
 dist/
+.omc/
 *.log
 .DS_Store
+.playwright-mcp/
+*.png
 # data/ holds your real records — keep it out of git but keep the folder
 /data/*.json
