@@ -44,7 +44,8 @@ function dataApiPlugin() {
             res.end(body);
             return;
           }
-          if (req.method === 'PUT') {
+          if (req.method === 'PUT' || req.method === 'POST') {
+            // POST is accepted so navigator.sendBeacon (unload flush) can save.
             ensureSeed();
             const raw = await readBody(req);
             let parsed;
