@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>FocusFlow — ADHD 工作任務管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#0c111b;color:#c6d1e0;font-family:'IBM Plex Sans','Noto Sans TC',sans-serif;}
+  *{box-sizing:border-box;}
+  a{color:#7ea6d9;text-decoration:none;} a:hover{color:#a3c2e8;}
+  ::placeholder{color:#4d5b70;}
+  textarea,input{font-family:inherit;}
+  @keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;background:#0c111b;">
+
+  <!-- Header -->
+  <header data-screen-label="頂欄" style="display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #1a2333;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#2c4a75,#1a2c49);display:flex;align-items:center;justify-content:center;color:#9fbfe6;font-weight:600;font-size:13px;">F</div>
+      <div style="font-weight:600;font-size:15px;color:#dde6f2;">FocusFlow</div>
+      <div style="font-size:12px;color:#5b6a80;">解放大腦的記憶空間</div>
+      <div style="display:flex;background:#0c1420;border:1px solid #1d2839;border-radius:9px;padding:3px;gap:3px;margin-left:14px;">
+        <button onClick="{{ viewToday }}" style="{{ viewTodayStyle }}">今天</button>
+        <button onClick="{{ viewHistory }}" style="{{ viewHistoryStyle }}">歷史與分析</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:14px;">
+      <div style="font-size:13px;color:#74849b;">{{ clockDate }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:500;color:#dde6f2;letter-spacing:1px;">{{ clockTime }}</div>
+    </div>
+  </header>
+
+  <!-- Reminder banners -->
+  <sc-if value="{{ showBreakReminder }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:12px;margin:14px 28px 0;padding:10px 16px;border-radius:10px;background:#1c2a42;border:1px solid #33507e;color:#a9c6ea;font-size:13.5px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:#6fa3e0;animation:pulseDot 2s infinite;"></span>
+      已連續專注 {{ elapsedMin }} 分鐘，建議起來走走、喝口水，休息 5 分鐘再回來。
+      <button onClick="{{ dismissBreak }}" style="margin-left:auto;background:none;border:1px solid #33507e;color:#a9c6ea;border-radius:7px;padding:4px 12px;font-size:12.5px;cursor:pointer;">知道了</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ showIdleReminder }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:12px;margin:14px 28px 0;padding:10px 16px;border-radius:10px;background:#2a2438;border:1px solid #4a3f66;color:#c3b6e0;font-size:13.5px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:#a08ad0;animation:pulseDot 2s infinite;"></span>
+      已經 {{ idleMin }} 分鐘沒有在計時了——要回到「{{ currentTitle }}」嗎？
+      <button onClick="{{ startTimer }}" style="margin-left:auto;background:#4a3f66;border:none;color:#e6def5;border-radius:7px;padding:5px 14px;font-size:12.5px;cursor:pointer;">繼續任務</button>
+      <button onClick="{{ dismissIdle }}" style="background:none;border:1px solid #4a3f66;color:#c3b6e0;border-radius:7px;padding:4px 12px;font-size:12.5px;cursor:pointer;">稍後</button>
+    </div>
+  </sc-if>
+
+  <!-- History & analytics -->
+  <sc-if value="{{ onHistory }}" hint-placeholder-val="{{ false }}">
+    <main data-screen-label="歷史與分析" style="flex:1;display:flex;flex-wrap:wrap;gap:18px;padding:18px 28px 90px;align-items:flex-start;">
+      <!-- Day list -->
+      <section style="flex:1 1 250px;max-width:320px;min-width:240px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:13px;font-weight:600;color:#8fa2bd;letter-spacing:.5px;">每日紀錄</div>
+        <sc-for list="{{ dayItems }}" as="d" hint-placeholder-count="5">
+          <div onClick="{{ d.select }}" style="{{ d.cardStyle }}">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <span style="{{ d.dateStyle }}">{{ d.dateText }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#6fa3e0;">{{ d.totalText }}</span>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:5px;font-size:11.5px;color:#5b6a80;">
+              <span>完成 {{ d.done }}</span><span>中斷 {{ d.interrupts }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+
+      <!-- Day detail -->
+      <section style="flex:2 1 380px;min-width:340px;display:flex;flex-direction:column;gap:14px;">
+        <div style="background:#111927;border:1px solid #1d2c44;border-radius:16px;padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <div style="font-size:16px;font-weight:600;color:#dfe9f6;">{{ selDayTitle }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#6fa3e0;">專注 {{ selDayTotal }}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:12.5px;font-weight:600;color:#8fa2bd;">任務</div>
+            <sc-for list="{{ selDayTasks }}" as="t" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+                <span style="{{ t.dotStyle }}"></span>
+                <span style="flex:1;color:#b3c2d8;">{{ t.title }}</span>
+                <span style="font-size:11px;color:#6fa3e0;background:#182640;border-radius:5px;padding:1px 7px;">{{ t.project }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#5b6a80;">{{ t.timeText }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:12.5px;font-weight:600;color:#8fa2bd;">中斷紀錄</div>
+            <sc-if value="{{ selDayNoPauses }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:12.5px;color:#4d5b70;">這天沒有中斷。</div>
+            </sc-if>
+            <sc-for list="{{ selDayPauses }}" as="p" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#9dabc2;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#5b6a80;">{{ p.time }}</span>
+                <span style="background:#1a2333;border-radius:5px;padding:1px 8px;font-size:12px;color:#8fa2bd;">{{ p.reason }}</span>
+                <span style="font-size:12px;color:#5b6a80;">{{ p.task }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analytics -->
+      <section style="flex:1 1 290px;min-width:280px;display:flex;flex-direction:column;gap:14px;">
+        <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;">
+            <div style="font-size:13px;font-weight:600;color:#8fa2bd;">7 日專注趨勢</div>
+            <div style="font-size:11.5px;color:#5b6a80;">日均 {{ avgDaily }}</div>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:8px;height:110px;">
+            <sc-for list="{{ trendItems }}" as="tr" hint-placeholder-count="7">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;">
+                <div style="font-size:10px;color:#5b6a80;font-family:'IBM Plex Mono',monospace;">{{ tr.hours }}</div>
+                <div style="{{ tr.barStyle }}"></div>
+                <div style="font-size:10.5px;color:#5b6a80;">{{ tr.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:600;color:#8fa2bd;">中斷原因分析（7 日）</div>
+          <sc-for list="{{ reasonStats }}" as="rs" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;">
+                <span style="color:#9dabc2;">{{ rs.reason }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;color:#6d7c92;">{{ rs.count }} 次</span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:#182234;overflow:hidden;">
+                <div style="{{ rs.barStyle }}"></div>
+              </div>
+            </div>
+          </sc-for>
+          <div style="font-size:11.5px;color:#5b6a80;line-height:1.5;">{{ insightText }}</div>
+        </div>
+        <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:600;color:#8fa2bd;">各專案工時（7 日）</div>
+          <sc-for list="{{ projStats }}" as="ps" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;">
+                <span style="color:#9dabc2;">{{ ps.name }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;color:#6d7c92;">{{ ps.timeText }}</span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:#182234;overflow:hidden;">
+                <div style="{{ ps.barStyle }}"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </main>
+  </sc-if>
+
+  <!-- Main grid -->
+  <sc-if value="{{ onToday }}" hint-placeholder-val="{{ true }}">
+  <main style="flex:1;display:flex;flex-wrap:wrap;gap:18px;padding:18px 28px 90px;align-items:flex-start;">
+
+    <!-- Left: tasks -->
+    <section data-screen-label="任務清單" style="flex:1 1 250px;max-width:340px;min-width:250px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;">
+        <div style="font-size:13px;font-weight:600;color:#8fa2bd;letter-spacing:.5px;">今日任務</div>
+        <div style="font-size:12px;color:#5b6a80;">{{ doneCount }}/{{ taskCount }} 完成</div>
+      </div>
+      <sc-for list="{{ taskItems }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.select }}" style="{{ t.cardStyle }}">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button onClick="{{ t.toggle }}" style="{{ t.checkStyle }}">{{ t.checkMark }}</button>
+            <div style="flex:1;min-width:0;">
+              <div style="{{ t.titleStyle }}">{{ t.title }}</div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:3px;">
+                <span onClick="{{ t.cycleProject }}" title="點擊切換專案" style="{{ t.projChipStyle }}">{{ t.project }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5b6a80;">{{ t.timeText }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <input value="{{ newTask }}" onChange="{{ setNewTask }}" onKeyDown="{{ newTaskKey }}" placeholder="新增任務，Enter 送出" style="background:#111927;border:1px solid #1d2839;border-radius:9px;padding:9px 12px;color:#c6d1e0;font-size:13px;outline:none;"></input>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <sc-for list="{{ projChips }}" as="pc" hint-placeholder-count="3">
+            <button onClick="{{ pc.pick }}" style="{{ pc.style }}">{{ pc.name }}</button>
+          </sc-for>
+          <button onClick="{{ openProjMgr }}" title="管理專案" style="background:none;border:1px dashed #24334c;color:#5b6a80;border-radius:7px;padding:3px 10px;font-size:11.5px;cursor:pointer;" style-hover="color:#8fa2bd;border-color:#39537e;">✎ 管理</button>
+        </div>
+      </div>
+
+      <!-- Today stats -->
+      <div style="margin-top:6px;background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+          <div style="font-size:13px;font-weight:600;color:#8fa2bd;">今日統計</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6fa3e0;">{{ statsTotal }}</div>
+        </div>
+        <div style="display:flex;gap:14px;font-size:12px;color:#74849b;">
+          <span>完成 <span style="color:#c6d1e0;font-weight:600;">{{ doneCount }}</span></span>
+          <span>中斷 <span style="color:#c6d1e0;font-weight:600;">{{ pauseCount }}</span></span>
+          <span>Idea <span style="color:#c6d1e0;font-weight:600;">{{ ideaCount }}</span></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <sc-for list="{{ statItems }}" as="st" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;">
+                <span style="color:#9dabc2;">{{ st.name }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;color:#6d7c92;">{{ st.timeText }}</span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:#182234;overflow:hidden;">
+                <div style="{{ st.barStyle }}"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <button onClick="{{ openExport }}" style="background:#182640;border:1px solid #24334c;color:#a9c6ea;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#1e3152;">📋 匯出日報 Prompt</button>
+      </div>
+    </section>
+
+    <!-- Center: focus card -->
+    <section data-screen-label="專注區" style="flex:2 1 420px;min-width:380px;display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#111927;border:1px solid #1d2c44;border-radius:16px;padding:26px 30px;display:flex;flex-direction:column;gap:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="{{ statusDotStyle }}"></span>
+            <span style="font-size:12.5px;font-weight:600;letter-spacing:1px;color:#8fa2bd;">{{ statusLabel }}</span>
+          </div>
+          <div style="display:flex;background:#0c1420;border:1px solid #1d2839;border-radius:9px;padding:3px;gap:3px;">
+            <button onClick="{{ setModeStopwatch }}" style="{{ modeBtnStopwatch }}">碼表</button>
+            <button onClick="{{ setModePomodoro }}" style="{{ modeBtnPomodoro }}">番茄鐘</button>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:22px;font-weight:600;color:#e6edf7;line-height:1.35;">{{ currentTitle }}</div>
+          <div style="font-size:13px;color:#6fa3e0;margin-top:4px;">{{ currentProject }}</div>
+        </div>
+
+        <div style="display:flex;align-items:flex-end;gap:24px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:64px;font-weight:500;color:#dfe9f6;letter-spacing:2px;line-height:1;">{{ timerText }}</div>
+          <div style="padding-bottom:8px;font-size:12.5px;color:#5b6a80;">{{ timerSubText }}</div>
+        </div>
+
+        <sc-if value="{{ isPomodoro }}" hint-placeholder-val="{{ false }}">
+          <div style="height:5px;border-radius:3px;background:#182234;overflow:hidden;">
+            <div style="{{ pomoBarStyle }}"></div>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ openPause }}" style="flex:0 0 auto;white-space:nowrap;background:#233b5e;border:none;color:#cfe0f5;border-radius:10px;padding:11px 30px;font-size:14.5px;font-weight:600;cursor:pointer;">⏸ 暫停</button>
+          </sc-if>
+          <sc-if value="{{ notRunning }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ startTimer }}" style="flex:0 0 auto;white-space:nowrap;background:#2c4a75;border:none;color:#e3eefb;border-radius:10px;padding:11px 30px;font-size:14.5px;font-weight:600;cursor:pointer;">▶ 開始專注</button>
+          </sc-if>
+          <button onClick="{{ finishTask }}" style="white-space:nowrap;background:none;border:1px solid #24334c;color:#8fa2bd;border-radius:10px;padding:11px 20px;font-size:13.5px;cursor:pointer;" style-hover="border-color:#39537e;color:#b7c8de;">✓ 完成任務</button>
+          <div style="margin-left:auto;align-self:center;font-size:12.5px;color:#5b6a80;">今日累積 <span style="font-family:'IBM Plex Mono',monospace;color:#8fa2bd;">{{ todayTotal }}</span></div>
+        </div>
+      </div>
+
+      <!-- Next-step capture -->
+      <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:13px;font-weight:600;color:#8fa2bd;">下一步 / 腦中冒出的想法</div>
+        <input value="{{ nextStep }}" onChange="{{ setNextStep }}" onKeyDown="{{ nextStepKey }}" placeholder="想到什麼先寫下來，Enter 記錄，不用中斷手上的事" style="background:#0c1420;border:1px solid #1d2839;border-radius:9px;padding:10px 13px;color:#c6d1e0;font-size:13.5px;outline:none;"></input>
+        <sc-for list="{{ stepItems }}" as="s" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:10px;font-size:13.5px;color:#b3c2d8;">
+            <span style="color:#4d6a99;">›</span>
+            <span style="flex:1;">{{ s.text }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4d5b70;">{{ s.time }}</span>
+            <button onClick="{{ s.remove }}" style="background:none;border:none;color:#4d5b70;cursor:pointer;font-size:14px;">×</button>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Interruption log -->
+      <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 20px;display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:13px;font-weight:600;color:#8fa2bd;">今日中斷紀錄</div>
+        <sc-if value="{{ noPauses }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:12.5px;color:#4d5b70;">還沒有中斷，狀態很好。</div>
+        </sc-if>
+        <sc-for list="{{ pauseItems }}" as="p" hint-placeholder-count="1">
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#9dabc2;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#5b6a80;">{{ p.time }}</span>
+            <span style="background:#1a2333;border-radius:5px;padding:1px 8px;font-size:12px;color:#8fa2bd;">{{ p.reason }}</span>
+            <span style="font-size:12px;color:#5b6a80;">{{ p.task }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- Right: ideas + notes -->
+    <section data-screen-label="靈感與筆記" style="flex:1 1 290px;min-width:280px;display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+          <div style="font-size:13px;font-weight:600;color:#8fa2bd;">💡 Idea 收集箱</div>
+          <div style="font-size:11.5px;color:#5b6a80;">之後可開成任務</div>
+        </div>
+        <sc-if value="{{ noIdeas }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:12.5px;color:#4d5b70;">用右下角的按鈕快速記下靈感。</div>
+        </sc-if>
+        <sc-for list="{{ ideaItems }}" as="i" hint-placeholder-count="3">
+          <div style="background:#0c1420;border:1px solid #1a2333;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13.5px;color:#c0cee2;line-height:1.45;">{{ i.text }}</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4d5b70;">{{ i.time }}</span>
+              <button onClick="{{ i.aiPrompt }}" title="複製 prompt 請 AI 整理成可執行的分階段任務" style="margin-left:auto;background:none;border:1px solid #24334c;color:#8fa2bd;border-radius:7px;padding:3px 10px;font-size:12px;cursor:pointer;" style-hover="border-color:#39537e;color:#a9c6ea;">AI 整理</button>
+              <button onClick="{{ i.promote }}" style="background:#182640;border:none;color:#7fb0e6;border-radius:7px;padding:4px 11px;font-size:12px;cursor:pointer;">開成任務 →</button>
+              <button onClick="{{ i.remove }}" style="background:none;border:none;color:#4d5b70;cursor:pointer;font-size:14px;">×</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;gap:4px;background:#0c1420;border:1px solid #1a2333;border-radius:9px;padding:3px;">
+          <button onClick="{{ tabNotes }}" style="{{ tabNotesStyle }}">筆記</button>
+          <button onClick="{{ tabReplies }}" style="{{ tabRepliesStyle }}">待回覆訊息</button>
+        </div>
+        <sc-if value="{{ onNotesTab }}" hint-placeholder-val="{{ true }}">
+          <textarea value="{{ globalNote }}" onChange="{{ setGlobalNote }}" placeholder="隨手記：會議重點、暫存的文字、任何不想佔用腦容量的東西…" style="min-height:170px;resize:vertical;background:#0c1420;border:1px solid #1a2333;border-radius:10px;padding:12px 13px;color:#c6d1e0;font-size:13.5px;line-height:1.6;outline:none;"></textarea>
+        </sc-if>
+        <sc-if value="{{ onRepliesTab }}" hint-placeholder-val="{{ false }}">
+          <input value="{{ newReply }}" onChange="{{ setNewReply }}" onKeyDown="{{ newReplyKey }}" placeholder="要回覆誰＋什麼事，Enter 加入" style="background:#0c1420;border:1px solid #1a2333;border-radius:9px;padding:9px 12px;color:#c6d1e0;font-size:13px;outline:none;"></input>
+          <sc-for list="{{ replyItems }}" as="r" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:10px;font-size:13.5px;">
+              <button onClick="{{ r.toggle }}" style="{{ r.checkStyle }}">{{ r.checkMark }}</button>
+              <span style="{{ r.textStyle }}">{{ r.text }}</span>
+            </div>
+          </sc-for>
+        </sc-if>
+      </div>
+
+      <div style="background:#111927;border:1px solid #1d2839;border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:13px;font-weight:600;color:#8fa2bd;">任務筆記 — {{ currentTitle }}</div>
+        <textarea value="{{ taskNote }}" onChange="{{ setTaskNote }}" placeholder="這個任務專屬的筆記、連結、進度…" style="min-height:90px;resize:vertical;background:#0c1420;border:1px solid #1a2333;border-radius:10px;padding:11px 13px;color:#c6d1e0;font-size:13px;line-height:1.6;outline:none;"></textarea>
+      </div>
+    </section>
+  </main>
+  </sc-if>
+
+  <!-- Floating quick capture -->
+  <button onClick="{{ openCapture }}" title="快速記錄 idea" style="position:fixed;right:30px;bottom:30px;width:58px;height:58px;border-radius:50%;background:#2c4a75;border:none;color:#e3eefb;font-size:26px;cursor:pointer;box-shadow:0 8px 26px rgba(20,45,85,.55);display:flex;align-items:center;justify-content:center;" style-hover="background:#365a8e;">＋</button>
+
+  <!-- Quick capture modal -->
+  <sc-if value="{{ showCapture }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeCapture }}" style="position:fixed;inset:0;background:rgba(6,10,17,.66);display:flex;align-items:flex-start;justify-content:center;padding-top:20vh;z-index:50;">
+      <div onClick="{{ stopProp }}" style="width:520px;background:#131c2b;border:1px solid #24334c;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div style="font-size:14px;font-weight:600;color:#c6d1e0;">💡 快速記錄</div>
+        <input value="{{ captureText }}" onChange="{{ setCaptureText }}" onKeyDown="{{ captureKey }}" autoFocus="{{ true }}" placeholder="腦中的想法丟進來就好，Enter 存入收集箱" style="background:#0c1420;border:1px solid #24334c;border-radius:10px;padding:13px 15px;color:#dfe9f6;font-size:15px;outline:none;"></input>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:12px;color:#5b6a80;">Esc 關閉 · 記完就回去專注</div>
+          <button onClick="{{ saveCapture }}" style="background:#2c4a75;border:none;color:#e3eefb;border-radius:9px;padding:8px 20px;font-size:13.5px;font-weight:600;cursor:pointer;">存入收集箱</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Finish task modal -->
+  <sc-if value="{{ showFinish }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(6,10,17,.66);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div style="width:500px;max-width:92vw;background:#131c2b;border:1px solid #24334c;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:#dfe9f6;">完成任務 🎉</div>
+          <div style="font-size:13px;color:#8fa2bd;margin-top:4px;">{{ currentTitle }} · 花費 {{ finishElapsed }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12.5px;font-weight:600;color:#8fa2bd;">做了什麼</div>
+          <textarea value="{{ finishSummary }}" onChange="{{ setFinishSummary }}" autoFocus="{{ true }}" placeholder="一兩句話：完成了什麼、產出在哪" style="min-height:70px;resize:vertical;background:#0c1420;border:1px solid #24334c;border-radius:10px;padding:11px 13px;color:#dfe9f6;font-size:13.5px;line-height:1.6;outline:none;"></textarea>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:12.5px;font-weight:600;color:#8fa2bd;">需要調整的地方 <span style="font-weight:400;color:#5b6a80;">（選填）</span></div>
+          <textarea value="{{ finishAdjust }}" onChange="{{ setFinishAdjust }}" placeholder="下次可以怎麼做更好、還有什麼要跟進" style="min-height:56px;resize:vertical;background:#0c1420;border:1px solid #1a2333;border-radius:10px;padding:11px 13px;color:#c6d1e0;font-size:13px;line-height:1.6;outline:none;"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onClick="{{ cancelFinish }}" style="background:none;border:1px solid #24334c;color:#8fa2bd;border-radius:9px;padding:8px 16px;font-size:13px;cursor:pointer;">取消</button>
+          <button onClick="{{ confirmFinish }}" style="background:#2c4a75;border:none;color:#e3eefb;border-radius:9px;padding:8px 20px;font-size:13.5px;font-weight:600;cursor:pointer;">✓ 完成任務</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Project manager modal -->
+  <sc-if value="{{ showProjMgr }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeProjMgr }}" style="position:fixed;inset:0;background:rgba(6,10,17,.66);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div onClick="{{ stopProp }}" style="width:440px;max-width:92vw;background:#131c2b;border:1px solid #24334c;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div style="font-size:15px;font-weight:600;color:#dfe9f6;">管理專案</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <sc-for list="{{ projMgrItems }}" as="pm" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="{{ pm.dotStyle }}"></span>
+              <input value="{{ pm.name }}" onChange="{{ pm.rename }}" style="flex:1;background:#0c1420;border:1px solid #1a2333;border-radius:8px;padding:8px 11px;color:#c6d1e0;font-size:13px;outline:none;"></input>
+              <span style="font-size:11.5px;color:#4d5b70;white-space:nowrap;">{{ pm.count }} 個任務</span>
+              <sc-if value="{{ pm.removable }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ pm.remove }}" title="移除（任務會歸到未分類）" style="background:none;border:none;color:#4d5b70;cursor:pointer;font-size:15px;padding:2px 6px;" style-hover="color:#c07f7f;">×</button>
+              </sc-if>
+              <sc-if value="{{ pm.locked }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:11px;color:#39465c;padding:2px 6px;">預設</span>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <input value="{{ newProj }}" onChange="{{ setNewProj }}" onKeyDown="{{ newProjKey }}" placeholder="新增專案名稱，Enter 加入" style="background:#0c1420;border:1px solid #24334c;border-radius:9px;padding:10px 13px;color:#dfe9f6;font-size:13.5px;outline:none;"></input>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:11.5px;color:#5b6a80;">移除專案時，任務會自動歸到「未分類」</div>
+          <button onClick="{{ closeProjMgr }}" style="background:#2c4a75;border:none;color:#e3eefb;border-radius:9px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;">完成</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Idea → AI prompt modal -->
+  <sc-if value="{{ showIdeaPrompt }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeIdeaPrompt }}" style="position:fixed;inset:0;background:rgba(6,10,17,.66);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div onClick="{{ stopProp }}" style="width:620px;max-width:92vw;background:#131c2b;border:1px solid #24334c;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+          <div style="font-size:15px;font-weight:600;color:#dfe9f6;">請 AI 整理成任務</div>
+          <div style="font-size:12px;color:#5b6a80;">複製後貼給 AI，產出可直接開成任務</div>
+        </div>
+        <textarea readOnly="{{ true }}" value="{{ ideaPromptText }}" style="min-height:260px;resize:vertical;background:#0c1420;border:1px solid #1a2333;border-radius:10px;padding:13px 15px;color:#b3c2d8;font-size:12.5px;line-height:1.65;font-family:'IBM Plex Mono',monospace;outline:none;"></textarea>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onClick="{{ closeIdeaPrompt }}" style="background:none;border:1px solid #24334c;color:#8fa2bd;border-radius:9px;padding:8px 16px;font-size:13px;cursor:pointer;">關閉</button>
+          <button onClick="{{ copyIdeaPrompt }}" style="background:#2c4a75;border:none;color:#e3eefb;border-radius:9px;padding:8px 20px;font-size:13.5px;font-weight:600;cursor:pointer;">{{ ideaCopyLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Export modal -->
+  <sc-if value="{{ showExport }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeExport }}" style="position:fixed;inset:0;background:rgba(6,10,17,.66);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div onClick="{{ stopProp }}" style="width:620px;max-width:92vw;background:#131c2b;border:1px solid #24334c;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+          <div style="font-size:15px;font-weight:600;color:#dfe9f6;">日報 Prompt</div>
+          <div style="font-size:12px;color:#5b6a80;">貼給 AI 就能整理成日報</div>
+        </div>
+        <textarea readOnly="{{ true }}" value="{{ exportText }}" style="min-height:300px;resize:vertical;background:#0c1420;border:1px solid #1a2333;border-radius:10px;padding:13px 15px;color:#b3c2d8;font-size:12.5px;line-height:1.65;font-family:'IBM Plex Mono',monospace;outline:none;"></textarea>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onClick="{{ closeExport }}" style="background:none;border:1px solid #24334c;color:#8fa2bd;border-radius:9px;padding:8px 16px;font-size:13px;cursor:pointer;">關閉</button>
+          <button onClick="{{ copyExport }}" style="background:#2c4a75;border:none;color:#e3eefb;border-radius:9px;padding:8px 20px;font-size:13.5px;font-weight:600;cursor:pointer;">{{ copyLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Pause reason modal -->
+  <sc-if value="{{ showPause }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(6,10,17,.66);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div style="width:460px;background:#131c2b;border:1px solid #24334c;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div style="font-size:15px;font-weight:600;color:#dfe9f6;">暫停計時 — 中斷原因？<span style="font-weight:400;font-size:12.5px;color:#5b6a80;">（可不填）</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <sc-for list="{{ reasonItems }}" as="rz" hint-placeholder-count="6">
+            <button onClick="{{ rz.pick }}" style="background:#182640;border:1px solid #24334c;color:#a9c0dd;border-radius:9px;padding:8px 16px;font-size:13.5px;cursor:pointer;" style-hover="background:#1e3152;border-color:#39537e;">{{ rz.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onClick="{{ closePause }}" style="background:none;border:1px solid #24334c;color:#8fa2bd;border-radius:9px;padding:8px 16px;font-size:13px;cursor:pointer;">取消</button>
+          <button onClick="{{ pauseNoReason }}" style="background:#233b5e;border:none;color:#cfe0f5;border-radius:9px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;">直接暫停</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;pomoMin&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:25,&quot;min&quot;:5,&quot;max&quot;:90,&quot;step&quot;:5,&quot;unit&quot;:&quot;分鐘&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;計時&quot;},&quot;breakReminderMin&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:50,&quot;min&quot;:10,&quot;max&quot;:120,&quot;step&quot;:5,&quot;unit&quot;:&quot;分鐘&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;提醒&quot;},&quot;idleReminderMin&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:5,&quot;min&quot;:1,&quot;max&quot;:30,&quot;step&quot;:1,&quot;unit&quot;:&quot;分鐘&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;提醒&quot;}}">
+class Component extends DCLogic {
+  state = {
+    now: new Date(),
+    tasks: [
+      { id: 1, title: '完成 Q3 產品規格初稿', project: '產品規劃', done: false, totalSec: 3720, note: '', steps: [{ text: '先確認 API 欄位再寫第三節', time: '10:24' }] },
+      { id: 2, title: '回覆設計團隊的元件命名建議', project: '設計協作', done: false, totalSec: 0, note: '', steps: [] },
+      { id: 3, title: '整理上週用戶訪談重點', project: '用戶研究', done: true, totalSec: 2700, note: '', steps: [] },
+    ],
+    currentId: 1,
+    running: false, elapsed: 0, mode: 'stopwatch',
+    idleSec: 0, breakDismissed: false, idleDismissed: false,
+    ideas: [{ text: '任務完成時可以加一個小小的慶祝動畫', time: '09:41' }],
+    pauses: [],
+    newTask: '', nextStep: '', captureText: '', newReply: '',
+    globalNote: '', tab: 'notes',
+    replies: [{ text: '回 Alex：週四 demo 時間確認', done: false }],
+    showCapture: false, showPause: false,
+    projects: ['產品規劃', '設計協作', '用戶研究', '未分類'],
+    newTaskProj: '未分類', showExport: false, copied: false,
+    view: 'today', selDay: 0,
+    ideaPromptFor: null, ideaCopied: false,
+    showProjMgr: false, newProj: '',
+    showFinish: false, finishSummary: '', finishAdjust: '',
+    history: [
+      { date: '2026-07-17', done: 3, byProj: { '產品規劃': 9840, '設計協作': 4500, '用戶研究': 2700 },
+        tasks: [
+          { title: '完成 Q3 產品規格初稿', project: '產品規劃', done: false, totalSec: 6300 },
+          { title: '規格審查會議準備', project: '產品規劃', done: true, totalSec: 3540 },
+          { title: '元件命名規範討論', project: '設計協作', done: true, totalSec: 4500 },
+          { title: '整理上週用戶訪談重點', project: '用戶研究', done: true, totalSec: 2700 },
+        ],
+        pauses: [
+          { time: '10:12', reason: '訊息回覆', task: '完成 Q3 產品規格初稿' },
+          { time: '11:40', reason: '會議', task: '完成 Q3 產品規格初稿' },
+          { time: '15:05', reason: '分心了', task: '元件命名規範討論' },
+        ] },
+      { date: '2026-07-16', done: 4, byProj: { '產品規劃': 7200, '用戶研究': 8100 },
+        tasks: [
+          { title: '用戶訪談 ×2', project: '用戶研究', done: true, totalSec: 5400 },
+          { title: '訪談逐字稿標記', project: '用戶研究', done: true, totalSec: 2700 },
+          { title: 'Q3 規格大綱', project: '產品規劃', done: true, totalSec: 4800 },
+          { title: '需求優先級排序', project: '產品規劃', done: true, totalSec: 2400 },
+        ],
+        pauses: [
+          { time: '09:50', reason: '訊息回覆', task: 'Q3 規格大綱' },
+          { time: '14:20', reason: '訊息回覆', task: '用戶訪談 ×2' },
+        ] },
+      { date: '2026-07-15', done: 2, byProj: { '設計協作': 10800, '未分類': 1800 },
+        tasks: [
+          { title: 'Design review + 修訂', project: '設計協作', done: true, totalSec: 7200 },
+          { title: '元件庫盤點', project: '設計協作', done: true, totalSec: 3600 },
+          { title: '信箱清理', project: '未分類', done: false, totalSec: 1800 },
+        ],
+        pauses: [
+          { time: '10:30', reason: '會議', task: 'Design review + 修訂' },
+          { time: '13:15', reason: '分心了', task: '元件庫盤點' },
+          { time: '16:00', reason: '被打斷', task: '元件庫盤點' },
+          { time: '16:40', reason: '分心了', task: '信箱清理' },
+        ] },
+      { date: '2026-07-14', done: 3, byProj: { '產品規劃': 5400, '設計協作': 3600, '用戶研究': 3600 },
+        tasks: [
+          { title: '週會 + 週報', project: '未分類', done: true, totalSec: 0 },
+          { title: '競品分析更新', project: '產品規劃', done: true, totalSec: 5400 },
+          { title: '設計走查', project: '設計協作', done: true, totalSec: 3600 },
+          { title: '訪談題綱草稿', project: '用戶研究', done: false, totalSec: 3600 },
+        ],
+        pauses: [ { time: '11:00', reason: '會議', task: '競品分析更新' } ] },
+      { date: '2026-07-13', done: 1, byProj: { '產品規劃': 4500 },
+        tasks: [ { title: '路線圖初稿', project: '產品規劃', done: true, totalSec: 4500 } ],
+        pauses: [
+          { time: '10:10', reason: '訊息回覆', task: '路線圖初稿' },
+          { time: '11:30', reason: '分心了', task: '路線圖初稿' },
+          { time: '14:00', reason: '訊息回覆', task: '路線圖初稿' },
+        ] },
+    ],
+  };
+  projColor(name) {
+    const hues = { '產品規劃': '#6fa3e0', '設計協作': '#7fd0c0', '用戶研究': '#c0a5e8', '未分類': '#8fa2bd', '來自 Idea': '#e0c07f' };
+    if (hues[name]) return hues[name];
+    const palette = ['#7fb0d8', '#8ec9a8', '#b8a8dd', '#d8b98a', '#89bcc9', '#c99ab0'];
+    let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
+    return palette[h % palette.length];
+  }
+  renameProj(oldName, newName) {
+    this.setState(s => ({
+      projects: s.projects.map(p => p === oldName ? newName : p),
+      tasks: s.tasks.map(t => t.project === oldName ? { ...t, project: newName } : t),
+      newTaskProj: s.newTaskProj === oldName ? newName : s.newTaskProj,
+    }));
+  }
+  buildIdeaPrompt(text) {
+    return [
+      '我有一個還很粗略的 idea，請幫我整理成可以直接執行的任務。要求：',
+      '- 內容精簡，不要贅字，每個步驟一句話、動詞開頭',
+      '- 幫我分階段（階段一、階段二…），每階段 2-4 個步驟',
+      '- 每個步驟要小到 30-60 分鐘內能完成',
+      '- 標出第一個可以立刻動手的步驟',
+      '- 如果 idea 太模糊，先列出需要我先回答的 1-3 個問題',
+      '',
+      '輸出格式：',
+      '任務名稱：（一句話）',
+      '階段一：…',
+      '- 步驟',
+      '階段二：…',
+      '',
+      '我的 idea：' + text,
+    ].join('\n');
+  }
+  buildExport() {
+    const s = this.state;
+    const fmt = (sec) => this.fmt(sec);
+    const cur = this.cur();
+    const byProj = {};
+    s.tasks.forEach(t => {
+      let sec = t.totalSec + (cur && t.id === cur.id ? s.elapsed : 0);
+      if (sec > 0) byProj[t.project] = (byProj[t.project] || 0) + sec;
+    });
+    const total = Object.values(byProj).reduce((a, b) => a + b, 0);
+    const lines = [];
+    lines.push('請根據以下今日工作紀錄，幫我整理成一份簡潔的日報（含：今日完成、進行中、遇到的中斷與影響、明日待辦）。用條列式、繁體中文。');
+    lines.push('');
+    lines.push('# 今日工作紀錄 — ' + s.now.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }));
+    lines.push('');
+    lines.push('## 任務');
+    s.tasks.forEach(t => {
+      const sec = t.totalSec + (cur && t.id === cur.id ? s.elapsed : 0);
+      lines.push('- [' + (t.done ? '完成' : '進行中') + '] ' + t.title + '（專案：' + t.project + '，工時：' + (sec > 0 ? fmt(sec) : '未計時') + '）');
+      if (t.summary) lines.push('    - 做了什麼：' + t.summary);
+      if (t.adjust) lines.push('    - 待調整：' + t.adjust);
+      t.steps.forEach(st => lines.push('    - 下一步：' + st.text));
+      if (t.note) lines.push('    - 筆記：' + t.note);
+    });
+    lines.push('');
+    lines.push('## 各專案工時（總計 ' + fmt(total) + '）');
+    Object.entries(byProj).forEach(([p, sec]) => lines.push('- ' + p + '：' + fmt(sec)));
+    lines.push('');
+    lines.push('## 中斷紀錄（' + s.pauses.length + ' 次）');
+    if (s.pauses.length === 0) lines.push('- 無');
+    s.pauses.forEach(p => lines.push('- ' + p.time + ' ' + p.reason + '（' + p.task + '）'));
+    if (s.ideas.length > 0) {
+      lines.push('');
+      lines.push('## 今日靈感');
+      s.ideas.forEach(i => lines.push('- ' + i.text));
+    }
+    if (s.globalNote.trim()) {
+      lines.push('');
+      lines.push('## 筆記');
+      lines.push(s.globalNote.trim());
+    }
+    return lines.join('\n');
+  }
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      this.setState(s => {
+        const next = { now: new Date() };
+        if (s.running) { next.elapsed = s.elapsed + 1; next.idleSec = 0; }
+        else { next.idleSec = s.idleSec + 1; }
+        return next;
+      });
+    }, 1000);
+    this.keyHandler = (e) => { if (e.key === 'Escape') this.setState({ showCapture: false, showPause: false }); };
+    window.addEventListener('keydown', this.keyHandler);
+  }
+  componentWillUnmount() { clearInterval(this.timer); window.removeEventListener('keydown', this.keyHandler); }
+  fmt(sec) {
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s2 = sec % 60;
+    const mm = String(m).padStart(2, '0'), ss = String(s2).padStart(2, '0');
+    return h > 0 ? h + ':' + mm + ':' + ss : mm + ':' + ss;
+  }
+  nowHM() { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  cur() { return this.state.tasks.find(t => t.id === this.state.currentId) || this.state.tasks[0]; }
+  updateCur(patch) {
+    this.setState(s => ({ tasks: s.tasks.map(t => t.id === s.currentId ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t) }));
+  }
+  doPause(reason) {
+    const cur = this.cur();
+    this.setState(s => ({
+      running: false, showPause: false, idleSec: 0, idleDismissed: false,
+      pauses: [{ time: this.nowHM(), reason: reason || '未填原因', task: cur ? cur.title : '' }, ...s.pauses],
+    }));
+    this.updateCur(t => ({ totalSec: t.totalSec + 0 }));
+  }
+  renderVals() {
+    const s = this.state;
+    const pomoMin = this.props.pomoMin ?? 25;
+    const breakMin = this.props.breakReminderMin ?? 50;
+    const idleMin = this.props.idleReminderMin ?? 5;
+    const cur = this.cur();
+    const pomoTotal = pomoMin * 60;
+    const isPomodoro = s.mode === 'pomodoro';
+    const remaining = Math.max(0, pomoTotal - s.elapsed);
+    const timerText = isPomodoro ? this.fmt(remaining) : this.fmt(s.elapsed);
+    const pomoDone = isPomodoro && s.running && remaining === 0;
+    const overBreak = !isPomodoro && s.running && s.elapsed >= breakMin * 60;
+    const activeTasks = s.tasks.filter(t => !t.done);
+    const chipOn = { flex: 1, whiteSpace: 'nowrap', background: '#233b5e', border: 'none', color: '#d5e3f6', borderRadius: '7px', padding: '6px 14px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' };
+    const chipOff = { ...chipOn, background: 'none', color: '#6d7c92', fontWeight: 400 };
+    const enter = (fn) => (e) => { if (e.key === 'Enter' && e.target.value.trim()) { fn(e.target.value.trim()); } };
+    return {
+      clockTime: s.now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+      clockDate: s.now.toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' }),
+      taskCount: s.tasks.length,
+      doneCount: s.tasks.filter(t => t.done).length,
+      taskItems: s.tasks.map(t => {
+        const isCur = t.id === s.currentId;
+        return {
+          ...t,
+          timeText: t.totalSec > 0 ? this.fmt(t.totalSec) : '—',
+          cardStyle: { background: isCur ? '#15233a' : '#111927', border: '1px solid ' + (isCur ? '#33507e' : '#1a2333'), borderRadius: '12px', padding: '12px 14px', cursor: 'pointer', opacity: t.done ? .55 : 1 },
+          titleStyle: { fontSize: '13.5px', fontWeight: isCur ? 600 : 500, color: isCur ? '#dfe9f6' : '#b3c2d8', textDecoration: t.done ? 'line-through' : 'none', lineHeight: 1.4 },
+          checkStyle: { width: '18px', height: '18px', flex: '0 0 auto', borderRadius: '6px', border: '1.5px solid ' + (t.done ? '#4d7ec2' : '#33425c'), background: t.done ? '#2c4a75' : 'none', color: '#dfe9f6', fontSize: '11px', cursor: 'pointer', padding: 0 },
+          checkMark: t.done ? '✓' : '',
+          projChipStyle: { fontSize: '11px', color: this.projColor(t.project), background: '#182640', borderRadius: '5px', padding: '1px 7px', cursor: 'pointer' },
+          cycleProject: (e) => {
+            e.stopPropagation();
+            const all = [...s.projects];
+            const idx = all.indexOf(t.project);
+            const next = all[(idx + 1) % all.length];
+            this.setState(st => ({ tasks: st.tasks.map(x => x.id === t.id ? { ...x, project: next } : x) }));
+          },
+          select: () => this.setState({ currentId: t.id, elapsed: t.id === s.currentId ? s.elapsed : 0, running: t.id === s.currentId ? s.running : false, breakDismissed: false }),
+          toggle: (e) => { e.stopPropagation(); this.setState(st => ({ tasks: st.tasks.map(x => x.id === t.id ? { ...x, done: !x.done } : x) })); },
+        };
+      }),
+      newTask: s.newTask,
+      setNewTask: (e) => this.setState({ newTask: e.target.value }),
+      newTaskKey: enter((v) => this.setState(st => ({ tasks: [...st.tasks, { id: Date.now(), title: v, project: st.newTaskProj, done: false, totalSec: 0, note: '', steps: [] }], newTask: '' }))),
+      projChips: s.projects.map(name => ({
+        name,
+        style: { background: s.newTaskProj === name ? '#233b5e' : 'none', border: '1px solid ' + (s.newTaskProj === name ? '#39537e' : '#1d2839'), color: s.newTaskProj === name ? this.projColor(name) : '#6d7c92', borderRadius: '7px', padding: '3px 10px', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap' },
+        pick: () => this.setState({ newTaskProj: name }),
+      })),
+      currentTitle: cur ? cur.title : '（選一個任務開始）',
+      currentProject: cur ? cur.project : '',
+      statusLabel: s.running ? '專注中 · NOW' : '已暫停',
+      statusDotStyle: { width: '9px', height: '9px', borderRadius: '50%', background: s.running ? '#5fd39a' : '#6d7c92', animation: s.running ? 'pulseDot 2s infinite' : 'none' },
+      timerText,
+      timerSubText: isPomodoro ? (pomoDone ? '番茄鐘完成！休息一下 🎉'.replace(' 🎉','') : '番茄鐘 ' + pomoMin + ' 分鐘') : '碼表計時',
+      isPomodoro,
+      pomoBarStyle: { height: '100%', width: (isPomodoro ? Math.min(100, (s.elapsed / pomoTotal) * 100) : 0) + '%', background: '#4d7ec2', transition: 'width 1s linear' },
+      modeBtnStopwatch: !isPomodoro ? chipOn : chipOff,
+      modeBtnPomodoro: isPomodoro ? chipOn : chipOff,
+      setModeStopwatch: () => this.setState({ mode: 'stopwatch' }),
+      setModePomodoro: () => this.setState({ mode: 'pomodoro', elapsed: 0 }),
+      running: s.running, notRunning: !s.running,
+      startTimer: () => this.setState({ running: true, idleSec: 0, idleDismissed: false, breakDismissed: false, elapsed: (isPomodoro && remaining === 0) ? 0 : s.elapsed }),
+      openPause: () => this.setState({ showPause: true }),
+      closePause: () => this.setState({ showPause: false }),
+      pauseNoReason: () => this.doPause(null),
+      reasonItems: ['會議', '訊息回覆', '被打斷', '分心了', '休息', '換任務'].map(label => ({ label, pick: () => this.doPause(label) })),
+      finishTask: () => this.setState({ showFinish: true, finishSummary: '', finishAdjust: '' }),
+      showFinish: s.showFinish,
+      finishElapsed: this.fmt((cur ? cur.totalSec : 0) + s.elapsed),
+      finishSummary: s.finishSummary,
+      finishAdjust: s.finishAdjust,
+      setFinishSummary: (e) => this.setState({ finishSummary: e.target.value }),
+      setFinishAdjust: (e) => this.setState({ finishAdjust: e.target.value }),
+      cancelFinish: () => this.setState({ showFinish: false }),
+      confirmFinish: () => {
+        this.updateCur(t => ({ done: true, totalSec: t.totalSec + s.elapsed, summary: s.finishSummary.trim(), adjust: s.finishAdjust.trim() }));
+        this.setState({ running: false, elapsed: 0, showFinish: false });
+      },
+      todayTotal: this.fmt((cur ? cur.totalSec : 0) + s.elapsed),
+      elapsedMin: Math.floor(s.elapsed / 60),
+      idleMin: Math.floor(s.idleSec / 60),
+      showBreakReminder: (overBreak || pomoDone) && !s.breakDismissed,
+      dismissBreak: () => this.setState({ breakDismissed: true, running: pomoDone ? false : s.running, elapsed: pomoDone ? 0 : s.elapsed }),
+      showIdleReminder: !s.running && s.idleSec >= idleMin * 60 && !s.idleDismissed && !!cur && !cur.done,
+      dismissIdle: () => this.setState({ idleDismissed: true }),
+      nextStep: s.nextStep,
+      setNextStep: (e) => this.setState({ nextStep: e.target.value }),
+      nextStepKey: enter((v) => { this.updateCur(t => ({ steps: [{ text: v, time: this.nowHM() }, ...t.steps] })); this.setState({ nextStep: '' }); }),
+      stepItems: (cur ? cur.steps : []).map((st2, i) => ({ ...st2, remove: () => this.updateCur(t => ({ steps: t.steps.filter((_, j) => j !== i) })) })),
+      noPauses: s.pauses.length === 0,
+      pauseItems: s.pauses,
+      noIdeas: s.ideas.length === 0,
+      ideaItems: s.ideas.map((idea, i) => ({
+        ...idea,
+        aiPrompt: () => this.setState({ ideaPromptFor: idea.text, ideaCopied: false }),
+        promote: () => this.setState(st => ({ tasks: [...st.tasks, { id: Date.now(), title: idea.text, project: '來自 Idea', done: false, totalSec: 0, note: '', steps: [] }], ideas: st.ideas.filter((_, j) => j !== i) })),
+        remove: () => this.setState(st => ({ ideas: st.ideas.filter((_, j) => j !== i) })),
+      })),
+      tabNotes: () => this.setState({ tab: 'notes' }),
+      tabReplies: () => this.setState({ tab: 'replies' }),
+      onNotesTab: s.tab === 'notes', onRepliesTab: s.tab === 'replies',
+      tabNotesStyle: s.tab === 'notes' ? chipOn : chipOff,
+      tabRepliesStyle: s.tab === 'replies' ? chipOn : chipOff,
+      globalNote: s.globalNote,
+      setGlobalNote: (e) => this.setState({ globalNote: e.target.value }),
+      newReply: s.newReply,
+      setNewReply: (e) => this.setState({ newReply: e.target.value }),
+      newReplyKey: enter((v) => this.setState(st => ({ replies: [...st.replies, { text: v, done: false }], newReply: '' }))),
+      replyItems: s.replies.map((r, i) => ({
+        ...r,
+        checkMark: r.done ? '✓' : '',
+        checkStyle: { width: '17px', height: '17px', flex: '0 0 auto', borderRadius: '6px', border: '1.5px solid ' + (r.done ? '#4d7ec2' : '#33425c'), background: r.done ? '#2c4a75' : 'none', color: '#dfe9f6', fontSize: '10px', cursor: 'pointer', padding: 0 },
+        textStyle: { color: r.done ? '#5b6a80' : '#b3c2d8', textDecoration: r.done ? 'line-through' : 'none' },
+        toggle: () => this.setState(st => ({ replies: st.replies.map((x, j) => j === i ? { ...x, done: !x.done } : x) })),
+      })),
+      taskNote: cur ? cur.note : '',
+      setTaskNote: (e) => this.updateCur({ note: e.target.value }),
+      showCapture: s.showCapture,
+      openCapture: () => this.setState({ showCapture: true, captureText: '' }),
+      closeCapture: () => this.setState({ showCapture: false }),
+      stopProp: (e) => e.stopPropagation(),
+      captureText: s.captureText,
+      setCaptureText: (e) => this.setState({ captureText: e.target.value }),
+      captureKey: (e) => { if (e.key === 'Enter' && s.captureText.trim()) this.setState(st => ({ ideas: [{ text: st.captureText.trim(), time: this.nowHM() }, ...st.ideas], captureText: '', showCapture: false })); },
+      saveCapture: () => { if (s.captureText.trim()) this.setState(st => ({ ideas: [{ text: st.captureText.trim(), time: this.nowHM() }, ...st.ideas], captureText: '', showCapture: false })); },
+      showPause: s.showPause,
+      showProjMgr: s.showProjMgr,
+      openProjMgr: () => this.setState({ showProjMgr: true }),
+      closeProjMgr: () => this.setState({ showProjMgr: false }),
+      newProj: s.newProj,
+      setNewProj: (e) => this.setState({ newProj: e.target.value }),
+      newProjKey: enter((v) => this.setState(st => st.projects.includes(v) ? { newProj: '' } : { projects: [...st.projects, v], newProj: '', newTaskProj: v })),
+      projMgrItems: s.projects.map((name) => ({
+        name,
+        count: s.tasks.filter(t => t.project === name).length,
+        removable: name !== '未分類',
+        locked: name === '未分類',
+        dotStyle: { width: '9px', height: '9px', flex: '0 0 auto', borderRadius: '50%', background: this.projColor(name) },
+        rename: (e) => { const v = e.target.value; if (v.trim()) this.renameProj(name, v); },
+        remove: () => this.setState(st => ({
+          projects: st.projects.filter(p => p !== name),
+          tasks: st.tasks.map(t => t.project === name ? { ...t, project: '未分類' } : t),
+          newTaskProj: st.newTaskProj === name ? '未分類' : st.newTaskProj,
+        })),
+      })),
+      showIdeaPrompt: !!s.ideaPromptFor,
+      ideaPromptText: s.ideaPromptFor ? this.buildIdeaPrompt(s.ideaPromptFor) : '',
+      closeIdeaPrompt: () => this.setState({ ideaPromptFor: null }),
+      ideaCopyLabel: s.ideaCopied ? '✓ 已複製' : '複製 Prompt',
+      copyIdeaPrompt: () => {
+        navigator.clipboard.writeText(this.buildIdeaPrompt(s.ideaPromptFor)).then(() => this.setState({ ideaCopied: true }));
+      },
+      ...(() => {
+        const byProj = {};
+        s.tasks.forEach(t => {
+          const sec = t.totalSec + (cur && t.id === cur.id ? s.elapsed : 0);
+          if (sec > 0) byProj[t.project] = (byProj[t.project] || 0) + sec;
+        });
+        const entries = Object.entries(byProj).sort((a, b) => b[1] - a[1]);
+        const total = entries.reduce((a, [, v]) => a + v, 0);
+        const max = entries.length ? entries[0][1] : 1;
+        return {
+          statsTotal: this.fmt(total),
+          pauseCount: s.pauses.length,
+          ideaCount: s.ideas.length,
+          statItems: entries.map(([name, sec]) => ({
+            name, timeText: this.fmt(sec),
+            barStyle: { height: '100%', width: Math.max(4, (sec / max) * 100) + '%', background: this.projColor(name), opacity: .75, transition: 'width 1s linear' },
+          })),
+        };
+      })(),
+      showExport: s.showExport,
+      exportText: s.showExport ? this.buildExport() : '',
+      openExport: () => this.setState({ showExport: true, copied: false }),
+      closeExport: () => this.setState({ showExport: false }),
+      copyLabel: s.copied ? '✓ 已複製' : '複製 Prompt',
+      copyExport: () => {
+        navigator.clipboard.writeText(this.buildExport()).then(() => this.setState({ copied: true }));
+      },
+      ...(() => {
+        const navOn = { whiteSpace: 'nowrap', background: '#233b5e', border: 'none', color: '#d5e3f6', borderRadius: '7px', padding: '5px 14px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' };
+        const navOff = { ...navOn, background: 'none', color: '#6d7c92', fontWeight: 400 };
+        const todayByProj = {};
+        s.tasks.forEach(t => {
+          const sec = t.totalSec + (cur && t.id === cur.id ? s.elapsed : 0);
+          if (sec > 0) todayByProj[t.project] = (todayByProj[t.project] || 0) + sec;
+        });
+        const days = [
+          { date: '今天', done: s.tasks.filter(t => t.done).length, byProj: todayByProj,
+            tasks: s.tasks.map(t => ({ title: t.title, project: t.project, done: t.done, totalSec: t.totalSec + (cur && t.id === cur.id ? s.elapsed : 0) })),
+            pauses: s.pauses },
+          ...s.history,
+        ];
+        const dayTotal = (d) => Object.values(d.byProj).reduce((a, b) => a + b, 0);
+        const fmtDate = (str) => {
+          if (str === '今天') return '今天';
+          const d = new Date(str + 'T00:00:00');
+          return d.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', weekday: 'short' });
+        };
+        const sel = days[Math.min(s.selDay, days.length - 1)];
+        const trend = [...days].slice(0, 7).reverse();
+        const maxDay = Math.max(...trend.map(dayTotal), 1);
+        const totalAll = days.slice(0, 7).reduce((a, d) => a + dayTotal(d), 0);
+        const reasonCount = {};
+        days.slice(0, 7).forEach(d => d.pauses.forEach(p => { reasonCount[p.reason] = (reasonCount[p.reason] || 0) + 1; }));
+        const reasons = Object.entries(reasonCount).sort((a, b) => b[1] - a[1]);
+        const maxReason = reasons.length ? reasons[0][1] : 1;
+        const projTotals = {};
+        days.slice(0, 7).forEach(d => Object.entries(d.byProj).forEach(([p, sec]) => { projTotals[p] = (projTotals[p] || 0) + sec; }));
+        const projEntries = Object.entries(projTotals).sort((a, b) => b[1] - a[1]);
+        const maxProj = projEntries.length ? projEntries[0][1] : 1;
+        return {
+          onToday: s.view === 'today', onHistory: s.view === 'history',
+          viewToday: () => this.setState({ view: 'today' }),
+          viewHistory: () => this.setState({ view: 'history', selDay: 0 }),
+          viewTodayStyle: s.view === 'today' ? navOn : navOff,
+          viewHistoryStyle: s.view === 'history' ? navOn : navOff,
+          dayItems: days.map((d, i) => ({
+            dateText: fmtDate(d.date), totalText: this.fmt(dayTotal(d)), done: d.done, interrupts: d.pauses.length,
+            cardStyle: { background: i === s.selDay ? '#15233a' : '#111927', border: '1px solid ' + (i === s.selDay ? '#33507e' : '#1a2333'), borderRadius: '12px', padding: '12px 14px', cursor: 'pointer' },
+            dateStyle: { fontSize: '13.5px', fontWeight: i === s.selDay ? 600 : 500, color: i === s.selDay ? '#dfe9f6' : '#b3c2d8' },
+            select: () => this.setState({ selDay: i }),
+          })),
+          selDayTitle: sel.date === '今天' ? '今天' : new Date(sel.date + 'T00:00:00').toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' }),
+          selDayTotal: this.fmt(dayTotal(sel)),
+          selDayTasks: sel.tasks.map(t => ({
+            title: t.title, project: t.project,
+            timeText: t.totalSec > 0 ? this.fmt(t.totalSec) : '未計時',
+            dotStyle: { width: '7px', height: '7px', flex: '0 0 auto', borderRadius: '50%', background: t.done ? '#5fd39a' : '#6d7c92' },
+          })),
+          selDayNoPauses: sel.pauses.length === 0,
+          selDayPauses: sel.pauses,
+          avgDaily: this.fmt(Math.round(totalAll / Math.min(days.length, 7))),
+          trendItems: trend.map(d => {
+            const t2 = dayTotal(d);
+            return {
+              label: d.date === '今天' ? '今天' : fmtDate(d.date).split('（')[0],
+              hours: (t2 / 3600).toFixed(1),
+              barStyle: { width: '100%', maxWidth: '26px', height: Math.max(4, (t2 / maxDay) * 70) + 'px', borderRadius: '4px 4px 0 0', background: d.date === '今天' ? '#4d7ec2' : '#2c4a75', opacity: .85 },
+            };
+          }),
+          reasonStats: reasons.map(([reason, count]) => ({
+            reason, count,
+            barStyle: { height: '100%', width: Math.max(6, (count / maxReason) * 100) + '%', background: '#8a9fc0', opacity: .7 },
+          })),
+          insightText: reasons.length ? '最常見的中斷是「' + reasons[0][0] + '」（' + reasons[0][1] + ' 次）。可以試著安排固定時段集中處理，減少切換成本。' : '這 7 天沒有中斷紀錄。',
+          projStats: projEntries.map(([name, sec]) => ({
+            name, timeText: this.fmt(sec),
+            barStyle: { height: '100%', width: Math.max(4, (sec / maxProj) * 100) + '%', background: this.projColor(name), opacity: .75 },
+          })),
+        };
+      })(),
+    };
+  }
+}
+</script>
+</body>
+</html>

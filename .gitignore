@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+# data/ holds your real records — keep it out of git but keep the folder
+/data/*.json
