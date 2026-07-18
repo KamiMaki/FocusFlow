@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "FocusFlow — 解放大腦記憶空間的 ADHD 工作任務管理器（本機 JSON 持久化）",
+  "description": "FocusFlow — 解放大腦記憶空間的工作任務管理器（本機 JSON 持久化）",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
