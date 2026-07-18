@@ -15,6 +15,9 @@ function ensureSeed() {
   if (!fs.existsSync(DATA_FILE)) {
     const seed = defaultData();
     seed.activeDate = todayKey();
+    // New data generation: stale tabs still holding an older generation in
+    // memory get their writes rejected (409) instead of resurrecting old data.
+    seed.rev = Date.now().toString(36);
     fs.writeFileSync(DATA_FILE, JSON.stringify(seed, null, 2), 'utf8');
   }
 }
@@ -55,6 +58,19 @@ function dataApiPlugin() {
               res.statusCode = 400;
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
               res.end(JSON.stringify({ ok: false, error: 'invalid JSON' }));
+              return;
+            }
+            // Generation guard: a write must carry the same rev as the file on
+            // disk. After a data reset, tabs loaded before the reset hold an
+            // older (or missing) rev — reject them so old state can never be
+            // flushed back over the new file.
+            let diskRev = null;
+            try { diskRev = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')).rev ?? null; } catch { /* unreadable file: allow write */ }
+            const bodyRev = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? (parsed.rev ?? null) : null;
+            if (diskRev !== null && bodyRev !== diskRev) {
+              res.statusCode = 409;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ ok: false, error: 'stale rev — reload the page' }));
               return;
             }
             fs.writeFileSync(DATA_FILE, JSON.stringify(parsed, null, 2), 'utf8');

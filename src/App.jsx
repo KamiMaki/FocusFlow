@@ -15,7 +15,7 @@ const IDLE_MIN = 5;
 
 // Fields that live in data/focusflow.json.
 const PERSIST_KEYS = [
-  'projects', 'newTaskProj', 'currentId', 'mode', 'tab',
+  'rev', 'projects', 'newTaskProj', 'currentId', 'mode', 'tab',
   'globalNote', 'tasks', 'ideas', 'replies', 'pauses', 'history', 'activeDate',
 ];
 

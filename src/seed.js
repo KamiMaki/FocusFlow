@@ -3,6 +3,7 @@
 // Returns a fresh deep copy each call so callers can freely mutate it.
 export function defaultData() {
   return {
+    rev: null, // data-generation token, set by the server when the seed is written
     activeDate: null, // set to todayKey() by the server when the seed is written
     projects: ['未分類'],
     newTaskProj: '未分類',

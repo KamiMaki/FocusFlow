@@ -27,21 +27,31 @@ async function put(data) {
 export function createSaver(delay = 500) {
   let timer = null;
   let pending = null;
+  let dead = false; // set on 409: this tab holds a stale data generation
 
   const send = () => {
     if (pending == null) return;
     const snapshot = pending;
     pending = null;
-    put(snapshot).catch((e) => console.error('[focusflow] autosave error', e));
+    put(snapshot).catch((e) => {
+      if (String(e && e.message).includes('409')) {
+        dead = true;
+        console.warn('[focusflow] data was reset elsewhere — this tab is stale, autosave disabled. Reload the page.');
+      } else {
+        console.error('[focusflow] autosave error', e);
+      }
+    });
   };
 
   return {
     schedule(data) {
+      if (dead) return;
       pending = data;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => { timer = null; send(); }, delay);
     },
     flush() {
+      if (dead) return;
       if (timer) { clearTimeout(timer); timer = null; }
       if (pending == null) return;
       const snapshot = pending;
