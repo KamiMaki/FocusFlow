@@ -8,7 +8,7 @@ export function defaultData() {
     projects: ['未分類'],
     newTaskProj: '未分類',
     currentId: null,
-    mode: 'stopwatch',
+    mode: 'pomodoro',
     elapsed: 0,
     tab: 'notes',
     globalNote: '',
