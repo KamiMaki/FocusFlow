@@ -66,6 +66,7 @@ export function computeToday(tasks, pauses, curId, elapsed) {
     done: tasks.filter((t) => t.done).length,
     byProj: byProject(tasks, curId, elapsed),
     tasks: tasks.map((t) => ({
+      ...t,
       title: t.title,
       project: t.project,
       done: t.done,
@@ -191,7 +192,7 @@ export function applyRollover(data, key = todayKey()) {
     date: data.activeDate,
     done: tasks.filter((t) => t.done).length,
     byProj: byProject(tasks, null, 0),
-    tasks: tasks.map((t) => ({ title: t.title, project: t.project, done: t.done, totalSec: t.totalSec || 0 })),
+    tasks: tasks.map((t) => ({ ...t, totalSec: t.totalSec || 0 })),
     pauses,
   };
   const carried = tasks
